@@ -1,0 +1,655 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Pizza Dough Recipe Calculator</title>
+    
+    <!-- PWA Metadata -->
+    <meta name="theme-color" content="#ef4444">
+    <link rel="apple-touch-icon" href="https://placehold.co/192x192/ef4444/ffffff?text=PC">
+    
+    <link rel="manifest" href="manifest.json">
+    <meta name="theme-color" content="#d32f2f">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+    <!-- Link to the Manifest (injected via JS below) -->
+    <link rel="manifest" href="#" id="pwa-manifest"> 
+    
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@100..900&display=swap');
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: #f7f7f7;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            padding: 2rem;
+            min-height: 10vh;
+        }
+        .container-card {
+            max-width: 48rem;
+            width: 100%;
+            background: white;
+            padding: 2rem;
+            border-radius: 1rem;
+            box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04);
+            display: grid;
+            gap: 2rem;
+            grid-template-columns: 1fr;
+        }
+        @media (min-width: 768px) {
+            .container-card {
+                grid-template-columns: 1fr 1fr;
+            }
+        }
+        .input-group input:not([readonly]):focus {
+            border-color: #ef4444; /* red-500 */
+            box-shadow: 0 0 0 3px rgba(239, 68, 68, 0.5);
+        }
+        .directions-card {
+            max-width: 48rem;
+            width: 100%;
+            background: white;
+            padding: 2rem;
+            border-radius: 1rem;
+            box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04);
+            margin-top: 2rem;
+        }
+    </style>
+</head>
+
+<script>
+ if ('serviceWorker' in navigator) {
+     navigator.service.Worker.register('sw.js')
+        .then(() => console.log("Service Worker Registered"))
+    }
+</script>
+
+<body class="bg-gray-100">
+
+    <div class="container-card">
+        <!-- Input Panel -->
+        <div class="space-y-6">
+            <h1 class="text-3xl font-bold text-red-600 border-b-2 border-red-200 pb-2">Pizza Dough Recipe Calculator</h1>
+            <p class="text-gray-600">Select a style to load the fixed baker's percentages, then choose the number of dough balls.</p>
+
+            <!-- Input: Pizza Style Selector -->
+            <div class="input-group">
+                <label for="pizzaStyle" class="block text-sm font-medium text-gray-700">Select Pizza Style</label>
+                <div class="mt-1 flex rounded-md shadow-sm">
+                    <select id="pizzaStyle" onchange="calculateDough()" class="flex-1 block w-full rounded-md border-gray-300 p-2 border focus:ring-red-500 focus:border-red-500 sm:text-lg bg-white">
+                        <option value="ny">NY Style Pizza</option>
+                        <option value="wholewheat">Whole Wheat Pizza</option>
+                        <option value="detroit">Detroit Style Pizza</option>
+                        <option value="bar">South Shore Bar Pizza</option>
+                        <option value="calzone">Calzone</option>
+                    </select>
+                </div>
+            </div>
+
+            <!-- Target Weight Input (Single Ball) - FIXED/READONLY -->
+            <div class="input-group">
+                <label for="targetWeight" class="block text-sm font-medium text-gray-700">Fixed Single Dough Ball Weight (Grams)</label>
+                <div class="mt-1 flex rounded-md shadow-sm">
+                    <input type="number" id="targetWeight" value="0.00" min="1" readonly class="flex-1 block w-full rounded-l-md border-gray-300 p-2 border bg-gray-200 cursor-not-allowed sm:text-lg">
+                    <span class="inline-flex items-center px-3 rounded-r-md border border-l-0 border-gray-300 bg-gray-50 text-gray-500 text-sm">
+                        grams
+                    </span>
+                </div>
+            </div>
+
+            <!-- Input: Number of Dough Balls (Dynamic) -->
+            <div class="input-group">
+                <label for="numBalls" class="block text-sm font-medium text-gray-700">Number of Dough Balls</label>
+                <div class="mt-1 flex rounded-md shadow-sm">
+                    <input type="number" id="numBalls" value="2" min="1" oninput="calculateDough()" class="flex-1 block w-full rounded-l-md border-gray-300 p-2 border focus:ring-red-500 focus:border-red-500 sm:text-lg" placeholder="e.g., 2">
+                    <span class="inline-flex items-center px-3 rounded-r-md border border-l-0 border-gray-300 bg-gray-50 text-gray-500 text-sm">
+                        balls
+                    </span>
+                </div>
+            </div>
+
+            <h2 class="text-xl font-semibold text-gray-800 pt-4 border-t border-gray-200">Baker's Percentages (Locked)</h2>
+            
+            <!-- NEW: Container for Flour Percentage Display (Dynamic) -->
+            <div id="flourPercDisplay" class="space-y-2">
+                <!-- Content filled by JS based on selected style -->
+            </div>
+
+            <!-- Percentage Inputs - All Fixed/Readonly, values updated by JS -->
+            <div class="space-y-4">
+                
+                <!-- Water (Hydration) -->
+                <div class="input-group flex items-center justify-between">
+                    <label for="waterPerc" class="text-base font-medium text-gray-700 w-1/3">Water (Hydration)</label>
+                    <div class="flex items-center w-2/3">
+                        <input type="number" id="waterPerc" value="0" min="0" readonly class="flex-1 block w-full rounded-l-md border-gray-300 p-2 border bg-gray-200 cursor-not-allowed sm:text-lg text-right">
+                        <span class="inline-flex items-center px-3 rounded-r-md border border-l-0 border-gray-300 bg-gray-50 text-gray-500 text-sm">%</span>
+                    </div>
+                </div>
+
+                <!-- Salt -->
+                <div class="input-group flex items-center justify-between">
+                    <label for="saltPerc" class="text-base font-medium text-gray-700 w-1/3">Salt</label>
+                    <div class="flex items-center w-2/3">
+                        <input type="number" id="saltPerc" value="0" min="0" step="0.1" readonly class="flex-1 block w-full rounded-l-md border-gray-300 p-2 border bg-gray-200 cursor-not-allowed sm:text-lg text-right">
+                        <span class="inline-flex items-center px-3 rounded-r-md border border-l-0 border-gray-300 bg-gray-50 text-gray-500 text-sm">%</span>
+                    </div>
+                </div>
+
+                <!-- Yeast -->
+                <div class="input-group flex items-center justify-between">
+                    <label for="yeastPerc" class="text-base font-medium text-gray-700 w-1/3">Yeast (IDY)</label>
+                    <div class="flex items-center w-2/3">
+                        <input type="number" id="yeastPerc" value="0" min="0" step="0.01" readonly class="flex-1 block w-full rounded-l-md border-gray-300 p-2 border bg-gray-200 cursor-not-allowed sm:text-lg text-right">
+                        <span class="inline-flex items-center px-3 rounded-r-md border border-l-0 border-gray-300 bg-gray-50 text-gray-500 text-sm">%</span>
+                    </div>
+                </div>
+
+                <!-- Oil (Optional) -->
+                <div class="input-group flex items-center justify-between">
+                    <label for="oilPerc" class="text-base font-medium text-gray-700 w-1/3">Oil (Optional)</label>
+                    <div class="flex items-center w-2/3">
+                        <input type="number" id="oilPerc" value="0" min="0" step="0.1" readonly class="flex-1 block w-full rounded-l-md border-gray-300 p-2 border bg-gray-200 cursor-not-allowed sm:text-lg text-right">
+                        <span class="inline-flex items-center px-3 rounded-r-md border border-l-0 border-gray-300 bg-gray-50 text-gray-500 text-sm">%</span>
+                    </div>
+                </div>
+
+                <!-- Sugar -->
+                <div class="input-group flex items-center justify-between">
+                    <label for="sugarPerc" class="text-base font-medium text-gray-700 w-1/3">Sugar</label>
+                    <div class="flex items-center w-2/3">
+                        <input type="number" id="sugarPerc" value="0" min="0" step="0.1" readonly class="flex-1 block w-full rounded-l-md border-gray-300 p-2 border bg-gray-200 cursor-not-allowed sm:text-lg text-right">
+                        <span class="inline-flex items-center px-3 rounded-r-md border border-l-0 border-gray-300 bg-gray-50 text-gray-500 text-sm">%</span>
+                    </div>
+                </div>
+
+                <!-- Diastatic Malt -->
+                <div class="input-group flex items-center justify-between">
+                    <label for="maltPerc" class="text-base font-medium text-gray-700 w-1/3">Diastatic Malt</label>
+                    <div class="flex items-center w-2/3">
+                        <input type="number" id="maltPerc" value="0" min="0" step="0.1" readonly class="flex-1 block w-full rounded-l-md border-gray-300 p-2 border bg-gray-200 cursor-not-allowed sm:text-lg text-right">
+                        <span class="inline-flex items-center px-3 rounded-r-md border border-l-0 border-gray-300 bg-gray-50 text-gray-500 text-sm">%</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Output Panel -->
+        <div class="space-y-6">
+            <h2 class="text-3xl font-bold text-gray-800 border-b-2 border-gray-200 pb-2">Ingredient Weights (Batch Total)</h2>
+
+            <!-- Results Table/List -->
+            <div id="results" class="bg-white border border-gray-300 rounded-lg divide-y divide-gray-200">
+                <!-- Filled by JS -->
+            </div>
+
+            <!-- Summary Totals -->
+            <div class="pt-4 space-y-3">
+                <div class="flex justify-between items-center text-lg font-medium text-gray-700">
+                    <span>Total Recipe Percentage:</span>
+                    <span id="totalPerc" class="text-xl font-bold text-red-600">0.0 %</span>
+                </div>
+                <!-- Display: Number of Balls -->
+                <div class="flex justify-between items-center text-lg font-medium text-gray-700">
+                    <span>Batch Size (Dough Balls):</span>
+                    <span id="displayNumBalls" class="text-xl font-bold text-gray-800">0</span>
+                </div>
+                <!-- Display: Total Target Weight (Single Ball * Num Balls) -->
+                <div class="flex justify-between items-center text-lg font-medium text-gray-700">
+                    <span>Total Target Dough Mass:</span>
+                    <span id="displayTotalTargetWeight" class="text-xl font-bold text-gray-800">0.0 g</span>
+                </div>
+
+                <div class="flex justify-between items-center text-xl font-bold border-t border-red-300 pt-3">
+                    <span class="text-red-800">Total Ingredients Required:</span>
+                    <span id="totalWeight" class="text-2xl font-extrabold text-red-600">0.0 g</span>
+                </div>
+            </div>
+
+            <div id="error-message" class="hidden bg-yellow-100 border-l-4 border-yellow-500 text-yellow-700 p-4 rounded-md" role="alert">
+                <p class="font-bold">Heads up!</p>
+                <p>Please enter a valid Number of Dough Balls (must be greater than 0).</p>
+            </div>
+        </div>
+    </div>
+
+    <!-- NEW SECTION: Directions - Content is now filled by JS -->
+    <div class="directions-card">
+        <h2 id="directionsTitle" class="text-3xl font-bold text-gray-800 border-b-2 border-gray-200 pb-2 mb-4">Dough Directions</h2>
+        <div id="directionsContent" class="space-y-3 text-gray-700 text-lg">
+            <!-- Directions filled dynamically by JavaScript -->
+        </div>
+    </div>
+
+    <script>
+        // --- PWA MANIFEST INJECTION (Service Worker logic removed to fix blob URL error) ---
+        
+        // 1. Define the Manifest JSON
+        const manifestJson = {
+            "name": "Pizza Dough Calculator",
+            "short_name": "PizzaCalc",
+            "description": "Calculate pizza dough ingredients based on baker's percentages.",
+            "start_url": ".",
+            "display": "standalone",
+            "background_color": "#ffffff",
+            "theme_color": "#ef4444",
+            "icons": [
+                {
+                    "src": "https://placehold.co/192x192/ef4444/ffffff?text=PC",
+                    "sizes": "192x192",
+                    "type": "image/png"
+                },
+                {
+                    "src": "https://placehold.co/512x512/ef4444/ffffff?text=PC",
+                    "sizes": "512x512",
+                    "type": "image/png"
+                }
+            ]
+        };
+
+        // 2. Inject the Manifest as a data URL (This allows the browser to show the "Install App" prompt)
+        const manifestLink = document.getElementById('pwa-manifest');
+        const manifestBlob = new Blob([JSON.stringify(manifestJson)], { type: 'application/json' });
+        // Use a Blob URL for single-file self-contained deployment
+        manifestLink.href = URL.createObjectURL(manifestBlob); 
+
+        // --- FIXED CONSTANTS BY STYLE ---
+
+        const FLOUR_PERCENTAGE = 100; // Base 100% for the flour component
+
+        // NY Style Constants
+        const NY_STYLE = {
+            name: "NY Style Pizza",
+            weight: 260.78, 
+            water: 60,
+            salt: 2,
+            yeast: 0.4,
+            oil: 2,
+            sugar: 2,
+            malt: 0.5,
+            whiteFlourPerc: null, // Indicates no split
+            wholeWheatFlourPerc: null, // Indicates no split
+            directions: [
+                'In the bowl of your stand mixer (or a large mixing bowl), whisk together the calculated amounts of <span class="text-red-600">Flour, Salt, Sugar, Yeast, and Diastatic Malt</span>.',
+                'Pour in the <span class="text-red-600">Water</span> and <span class="text-red-600">Oil</span>, if used. Mix on the lowest speed for 8 minutes, by which time the dough will have pulled away from the walls of the bowl.',
+                'Divide and Ball: Gently turn the dough onto a clean surface. Divide it into the number of dough balls calculated above. Shape each piece tightly into a smooth, round ball, and lightly oil.',
+                'Cold Fermentation (Recommended for NY Style): Place each ball in its own lightly oiled, covered container. Refrigerate immediately for **24 to 72 hours** for the best complex flavor and texture.',
+                'Baking Prep: Remove the dough from the refrigerator about <span class="text-red-600">2-3 hours</span> before you plan to bake. Allow the balls to warm up to room temperature before gently stretching them to your desired pizza shape.'
+            ]
+        };
+
+        // Whole Wheat Style Constants
+        const WHOLE_WHEAT_STYLE = {
+            name: "Whole Wheat Pizza (Blended Flour)",
+            weight: 260.0,
+            water: 62.0, 
+            salt: 2.0, 
+            yeast: 0.8, 
+            oil: 2.0, 
+            sugar: 2.0, 
+            malt: 0.5, 
+            whiteFlourPerc: 60.0, // 60% of the total flour is white flour
+            wholeWheatFlourPerc: 40.0, // 40% of the total flour is whole wheat flour
+            directions: [
+                'Autolyse: Mix the <span class="text-red-600">Flour and Water</span> only. Cover and let rest for 30 minutes. This allows the whole wheat bran to soften, improving dough texture.',
+                'Final Mix: Add the <span class="text-red-600">Salt, Yeast, Oil, Sugar, and Diastatic Malt</span>. Mix on low speed for 8-10 minutes until the dough is smooth and tacky. Whole wheat dough can be delicate, so avoid over-kneading.',
+                'Divide and Ball: Gently divide the dough into the required number of balls. Shape, oil lightly, and place in containers.',
+                'Cold Fermentation (Recommended): Refrigerate for 24-48 hours to develop flavor and help the dough become more manageable.',
+                'Baking Prep: Remove dough from the fridge 2-3 hours before baking. Gently stretch it, ensuring not to tear the delicate whole wheat structure.'
+            ]
+        };
+
+        // Detroit Style Constants
+        const DETROIT_STYLE = {
+            name: "Detroit Style Pizza (Long Fermentation)",
+            weight: 308.0, 
+            water: 65.57,
+            salt: 2,
+            yeast: 0.83,
+            oil: 0, 
+            sugar: 0,
+            malt: 0, 
+            whiteFlourPerc: null, // Indicates no split
+            wholeWheatFlourPerc: null, // Indicates no split
+            directions: [
+                'Combine all calculated ingredients (<span class="text-red-600">Flour, Water, Salt, Yeast</span>) in a stand mixer and run on low for 6-8 minutes until a smooth ball forms.',
+                'Stretch and fold the dough over itself a few times to make a large ball.',
+                'Cover bowl with plastic wrap and let it sit in a warm spot for 30 minutes.',
+                'After 30 minutes, stretch and fold the dough a few times again. Repeat this 2-3 times, covering and allowing the dough to rest for 30 minutes each time. (This builds strength).',
+                'Allow the dough to rest for 60 minutes after the last stretch and fold and then put in the fridge for a day or two until the day the pizza is to be made.',
+                'On the bake day, take the dough out of the fridge at 1 PM (noon if it is a colder day) and allow to sit on the counter for 2 hours (3 on a colder day) to warm up.',
+                'Separate the dough into balls if necessary.',
+                'Put approximately 1 Tbsp of olive oil in the Detroit Pizza Pan and coat the entire pan with the <span class="text-red-600">Oil</span> using one hand. ',
+                'Place the dough in the pan and gently stretch it out to cover as much of the pan as possible, but no more than around 75%.',
+                'Cover and allow the dough to rest for about 30 minutes (This relaxes the gluten).',
+                'After 30 minutes, stretch the dough out to the edges and allow to rest and rise for 2 hours (Final Proofing).',
+                '45 minutes before the dough is supposed to be ready, begin preheating an oven with a pizza stone at <span class="text-red-600">500°F (260°C)</span>.',
+                'After two hours, the dough should touch the pan\'s edges and be ready to be topped.',
+                'Put 8 oz of shredded cheese on the dough (4 oz Mozz + 4 oz Monterrey Jack or 8 oz Brick cheese). ',
+                'Add two generous stripes of sauce and then cover with toppings.',
+                'Bake for 16-18 minutes until edges are well done and caramelized.'
+            ]
+        };
+        
+        // South Shore Bar Pizza Constants - UPDATED DIRECTIONS
+        const SOUTH_SHORE_BAR_STYLE = {
+            name: "South Shore Bar Pizza (Thin & Crispy)",
+            weight: 220.5, 
+            water: 57.0, 
+            salt: 1.9, 
+            yeast: 1.15, 
+            oil: 7.6, 
+            sugar: 0.0, 
+            malt: 0.0, 
+            whiteFlourPerc: null, 
+            wholeWheatFlourPerc: null,
+            directions: [
+                '<span class="font-semibold text-red-700">-- Dough Prep --</span>',
+                'Combine all calculated ingredients (<span class="text-red-600">Flour, Water, Salt, Yeast, and Oil</span>) in a stand mixer with a <span class="text-red-600">dough hook</span>.',
+                'Mix on low/medium speed for 8 minutes.',
+                'The dough is ready when it is smooth and clears the sides of the bowl.',
+                'Allow the dough to sit at room temperature for <span class="text-red-600">30 minutes</span>.',
+                'Refrigerate the dough for cold fermentation.',
+                '<span class="font-semibold">Pre-Bake Prep:</span> Remove the dough from the refrigerator at least <span class="text-red-600">2 hours prior to use</span> to allow it to come to room temperature, then separate into balls and store lightly.',
+                
+                '<span class="font-semibold text-red-700">-- Pizza Prep & Baking --</span>',
+                'Preheat oven with a pizza stone inside to <span class="text-red-600">550°F (288°C)</span>.',
+                'To shape the dough, flip the dough ball onto a floured surface. Use a rolling pin to roll it out into a thin <span class="text-red-600">10-inch round</span>.',
+                '<span class="font-semibold">Docking:</span> Poke holes evenly across the dough with a fork.',
+                'Place the rolled-out dough into an oiled pizza pan (generous use of <span class="text-red-600">oil spray</span> is recommended) and spread it out smoothly into the pan.',
+                'Press the perimeter of the crust up the sides of the pan a little to form the edge.',
+                'Add enough sauce to spread from edge to edge, followed by the <span class="text-red-600">cheese blend</span>.',
+                'Put grated Parmesan cheese on top of the main cheese blend.',
+                'Place the pizza **in the pan** into the preheated oven for the initial bake of <span class="text-red-600">6 minutes</span>.',
+                'When the cheese is melted, carefully transfer the pizza **from the pan onto the pizza stone**.',
+                'Bake for an additional <span class="text-red-600">3-5 minutes</span> to crisp the bottom crust.',
+                'Remove the pizza and allow it to cool for 2 minutes. Cut and serve immediately.'
+            ]
+        };
+
+        // Calzone Constants - UPDATED DIRECTIONS
+        const CALZONE = {
+            name: "Calzone",
+            weight: 130, 
+            water: 62.0, 
+            salt: 2, 
+            yeast: 0.75, 
+            oil: 3, 
+            sugar: 2, 
+            malt: 0.5, 
+            whiteFlourPerc: null, 
+            wholeWheatFlourPerc: null,
+            directions: [
+                '<span class="font-semibold text-red-700">-- Dough Prep --</span>',
+                'Combine all calculated ingredients (<span class="text-red-600">Flour, Water, Salt, Yeast, and Oil</span>) in a stand mixer with a <span class="text-red-600">dough hook</span>.',
+                'Mix on low/medium speed for 8 minutes.',
+                'The dough is ready when it is smooth and clears the sides of the bowl.',
+                'Allow the dough to sit at room temperature for <span class="text-red-600">30 minutes</span>.',
+                'Split dough into balls and refrigerate indicidually for upto 72 hours.',
+                '<span class="font-semibold">Pre-Bake Prep:</span> Remove the dough from the refrigerator at least <span class="text-red-600">2 hours prior to use</span> to allow it to come to room temperature, then separate into balls and store lightly.',
+                
+                '<span class="font-semibold text-red-700">-- Pizza Prep & Baking --</span>',
+                'Preheat oven with a pizza stone inside to <span class="text-red-600">550°F (288°C)</span>.',
+                'To shape the dough, flip the dough ball onto a floured surface. Use a rolling pin to roll it out into a thin <span class="text-red-600">10-inch round</span>.',
+                'Add ricotta, mozzarrella and desired toppings.',
+                'Wet your fingertips with water and dab around the edge to moisten the perimeter of the dough. Fold top half of dough over the bottom to enclose cheeses and press around the edges to seal well.',
+                'Make small slits on the top of the calzone to allow steam to permeate out.',
+                'Brush with butter, garlic butter, or egg wash.',
+                'Place the calzone the preheated oven for <span class="text-red-600">10 minutes</span>. Note that multiple calzones can be baked together as long as they fit on the stone.',
+                'Remove the calzone and allow it to cool for 2 minutes. Cut and serve immediately.'
+            ]
+        };        
+
+        // Mapping for easy lookup
+        const RECIPES = {
+            ny: NY_STYLE,
+            wholewheat: WHOLE_WHEAT_STYLE,
+            detroit: DETROIT_STYLE,
+            bar: SOUTH_SHORE_BAR_STYLE,
+            calzone: CALZONE // Add the new recipe
+        };
+        
+        // Input IDs mapped to their corresponding percentage property in the recipe object
+        const PERC_INPUT_MAP = {
+            'waterPerc': 'water',
+            'saltPerc': 'salt',
+            'yeastPerc': 'yeast',
+            'oilPerc': 'oil',
+            'sugarPerc': 'sugar',
+            'maltPerc': 'malt'
+        };
+
+        /**
+         * Formats a number to two decimal places.
+         * @param {number} num - The number to format.
+         * @returns {string} The formatted string.
+         */
+        function formatWeight(num) {
+            // Use toFixed for precise rounding, then parseFloat to remove trailing zeros if they are .00
+            return (Math.round(num * 100) / 100).toFixed(2);
+        }
+
+        /**
+         * Updates the UI elements (inputs and directions) based on the selected style.
+         * @param {Object} currentRecipe - The recipe object for the selected style.
+         */
+        function updateUIForStyle(currentRecipe) {
+            // Update single ball target weight
+            document.getElementById('targetWeight').value = currentRecipe.weight.toFixed(2);
+            
+            // Update percentages in the read-only inputs
+            for (const id in PERC_INPUT_MAP) {
+                const percKey = PERC_INPUT_MAP[id];
+                const percValue = currentRecipe[percKey] || 0; // Use 0 if property is missing/null
+                
+                // Use the correct precision for the inputs
+                let precision = 2; 
+                if (id === 'yeastPerc') {
+                    precision = 2; // For yeast (1.15)
+                } else if (id === 'oilPerc' || id === 'saltPerc' || id === 'sugarPerc' || id === 'maltPerc') {
+                    precision = 1; // For 7.6 or 1.9
+                } else {
+                    precision = 1; // For water (57.0)
+                }
+                
+                document.getElementById(id).value = percValue.toFixed(precision);
+                
+                // Mute/unmute the text color based on if the percentage is zero
+                const label = document.querySelector(`label[for="${id}"]`);
+                const input = document.getElementById(id);
+
+                if (percValue === 0) {
+                    label.classList.add('text-gray-400');
+                    input.classList.add('opacity-50');
+                } else {
+                    label.classList.remove('text-gray-400');
+                    input.classList.remove('opacity-50');
+                }
+            }
+            
+            // --- DYNAMIC FLOUR DISPLAY UPDATE ---
+            const flourDisplay = document.getElementById('flourPercDisplay');
+            flourDisplay.innerHTML = ''; // Clear previous content
+
+            if (currentRecipe.whiteFlourPerc && currentRecipe.wholeWheatFlourPerc) {
+                // Show split flours for Whole Wheat
+                flourDisplay.innerHTML = `
+                    <h3 class="text-lg font-semibold text-gray-800">Flour Blend (100% Total)</h3>
+                    <div class="flex justify-between items-center bg-red-50 p-3 rounded-lg border border-red-200">
+                        <span class="text-base font-medium text-red-800">White Flour</span>
+                        <span class="text-xl font-bold text-red-600">${currentRecipe.whiteFlourPerc.toFixed(1)}%</span>
+                    </div>
+                    <div class="flex justify-between items-center bg-red-50 p-3 rounded-lg border border-red-200">
+                        <span class="text-base font-medium text-red-800">Whole Wheat Flour</span>
+                        <span class="text-xl font-bold text-red-600">${currentRecipe.wholeWheatFlourPerc.toFixed(1)}%</span>
+                    </div>
+                `;
+            } else {
+                // Show single flour for NY/Detroit/Bar
+                flourDisplay.innerHTML = `
+                    <div class="flex justify-between items-center bg-red-50 p-3 rounded-lg border border-red-200">
+                        <label class="text-base font-medium text-red-800">Flour</label>
+                        <div class="flex items-center space-x-2">
+                            <span class="text-2xl font-bold text-red-600">100</span>
+                            <span class="text-lg font-medium text-red-600">%</span>
+                        </div>
+                    </div>
+                `;
+            }
+
+
+            // Update Directions section
+            document.getElementById('directionsTitle').textContent = `${currentRecipe.name} Dough Directions`;
+            const directionsContent = document.getElementById('directionsContent');
+            directionsContent.innerHTML = ''; // Clear previous content
+
+            let directionsHTML = '<ol class="list-decimal list-inside space-y-3 text-gray-700 text-lg">';
+            currentRecipe.directions.forEach((step, index) => {
+                // Determine if this step is a section header to avoid numbering it
+                const isHeader = step.includes('text-red-700'); 
+                if (isHeader) {
+                    // Render headers outside of the <li> tag for better visual separation
+                    // The replace is needed to clean up the span tags used for styling the header text
+                    directionsHTML += `<li class="list-none pt-2 pb-1 text-xl font-bold text-red-700">${step.replace(/<span.*?>(.*?)<\/span>/g, '$1')}</li>`;
+                } else {
+                    directionsHTML += `<li><span class="font-semibold">Step ${index + 1}:</span> ${step}</li>`;
+                }
+            });
+            directionsHTML += '</ol>';
+            directionsContent.innerHTML = directionsHTML;
+        }
+
+
+        /**
+         * Main function to calculate all ingredient weights based on baker's percentages.
+         */
+        function calculateDough() {
+            const styleSelector = document.getElementById('pizzaStyle');
+            const selectedStyleKey = styleSelector.value;
+            const currentRecipe = RECIPES[selectedStyleKey];
+
+            // 1. Update UI to reflect the newly selected constants
+            updateUIForStyle(currentRecipe);
+
+            // 2. Get Dynamic Input & Fixed Constants
+            const singleBallWeight = currentRecipe.weight;
+            const numBallsInput = document.getElementById('numBalls');
+            // Default to 0 if input is invalid or empty to ensure validation catches it
+            const numberOfDoughBalls = parseInt(numBallsInput.value) || 0; 
+
+            // DOM elements for output/feedback
+            const errorMessage = document.getElementById('error-message');
+            const resultsDiv = document.getElementById('results');
+            const totalPercSpan = document.getElementById('totalPerc');
+            const totalWeightSpan = document.getElementById('totalWeight');
+            const displayNumBallsSpan = document.getElementById('displayNumBalls');
+            const displayTotalTargetWeightSpan = document.getElementById('displayTotalTargetWeight');
+
+            // --- 3. Calculate Total Target Weight ---
+            const totalTargetWeight = singleBallWeight * numberOfDoughBalls;
+
+            // --- 4. Validation ---
+            if (numberOfDoughBalls <= 0) {
+                errorMessage.innerHTML = '<p class="font-bold">Heads up!</p><p>Please enter a valid Number of Dough Balls (must be greater than 0).</p>';
+                errorMessage.classList.remove('hidden');
+                resultsDiv.innerHTML = '';
+                totalPercSpan.textContent = '0.0 %';
+                totalWeightSpan.textContent = '0.0 g';
+                displayNumBallsSpan.textContent = '0';
+                displayTotalTargetWeightSpan.textContent = '0.0 g';
+                // Highlight invalid input
+                numBallsInput.classList.toggle('border-red-500', numberOfDoughBalls <= 0);
+                return;
+            }
+            // Clear errors and input highlights
+            errorMessage.classList.add('hidden');
+            numBallsInput.classList.remove('border-red-500');
+
+            // --- 5. Gather Percentages (Dynamic Flour Handling) ---
+            let ingredients = [];
+
+            if (selectedStyleKey === 'wholewheat') {
+                // Handle the split flour case: 60% White, 40% Whole Wheat
+                ingredients.push(
+                    { name: 'White Flour', perc: currentRecipe.whiteFlourPerc },
+                    { name: 'Whole Wheat Flour', perc: currentRecipe.wholeWheatFlourPerc }
+                );
+            } else {
+                // Handle the single flour case: 100% Flour
+                ingredients.push(
+                    { name: 'Flour', perc: FLOUR_PERCENTAGE }
+                );
+            }
+
+            // Add remaining non-flour ingredients
+            ingredients.push(
+                { name: 'Water', perc: currentRecipe.water },
+                { name: 'Salt', perc: currentRecipe.salt },
+                { name: 'Yeast', perc: currentRecipe.yeast },
+                { name: 'Oil', perc: currentRecipe.oil },
+                { name: 'Sugar', perc: currentRecipe.sugar },
+                { name: 'Diastatic Malt', perc: currentRecipe.malt },
+            );
+
+            // --- 6. Calculate Total Percentage ---
+            const totalRecipePercentage = ingredients.reduce((sum, ing) => sum + ing.perc, 0);
+
+            // --- 7. Calculate Weights ---
+            let calculatedTotalWeight = 0;
+            const calculatedIngredients = ingredients.map(ing => {
+                // Formula: Ingredient Weight = (TOTAL Target Weight / Total Recipe Percentage) * Ingredient Percentage
+                const weight = totalRecipePercentage > 0 ? (totalTargetWeight / totalRecipePercentage) * ing.perc : 0; 
+                calculatedTotalWeight += weight;
+                return {
+                    name: ing.name,
+                    perc: ing.perc,
+                    weight: weight
+                };
+            });
+            
+            // --- 8. Update UI (Results) ---
+            let resultsHTML = '';
+            calculatedIngredients.forEach(ing => {
+                const weightStr = formatWeight(ing.weight);
+                const percStr = formatWeight(ing.perc);
+                
+                let textColor = 'text-gray-900';
+                let weightClass = 'font-bold';
+                
+                // Highlight flour components
+                if (ing.name.includes('Flour')) {
+                    textColor = 'text-red-700';
+                    weightClass = 'font-extrabold';
+                }
+
+                // If the weight is 0, make the text slightly muted
+                const mutedClass = (ing.weight === 0) ? 'text-gray-400 opacity-70' : '';
+
+                resultsHTML += `
+                    <div class="flex justify-between items-center p-4">
+                        <span class="text-base font-medium ${textColor} ${mutedClass}">${ing.name} (${percStr}%)</span>
+                        <span class="text-2xl ${weightClass} ${textColor} ${mutedClass}">${weightStr} g</span>
+                    </div>
+                `;
+            });
+            resultsDiv.innerHTML = resultsHTML;
+
+            // --- 9. Update UI (Summary) ---
+            totalPercSpan.textContent = `${formatWeight(totalRecipePercentage)} %`;
+            displayNumBallsSpan.textContent = numberOfDoughBalls;
+            displayTotalTargetWeightSpan.textContent = `${formatWeight(totalTargetWeight)} g`;
+            totalWeightSpan.textContent = `${formatWeight(calculatedTotalWeight)} g`; 
+        }
+
+        // Run calculation on page load with default values
+        window.onload = () => {
+             // Set the selector to 'ny' as the default
+             document.getElementById('pizzaStyle').value = 'ny';
+             calculateDough();
+        };
+    </script>
+</body>
+</html>
